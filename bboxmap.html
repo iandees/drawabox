@@ -1,0 +1,83 @@
+<html>
+  <head>
+    <style type="text/css"> 
+      html, body, #bboxmap {
+      width: 700px;
+      height: 500px;
+      margin: 0;
+      }
+    </style> 
+ 
+    <script type="text/javascript" src="static/js/OpenLayers.js"></script> 
+    <script type="text/javascript">
+    var goog =  new OpenLayers.Projection("EPSG:900913");
+    var latlon = new OpenLayers.Projection("EPSG:4326"); 
+    var map, bboxVector;
+    
+    function updateBbox(ll, ur) {
+       var bounds = new OpenLayers.Bounds(ll.lon, ll.lat,
+                                            ur.lon, ur.lat);
+       bounds.transform(latlon, goog);
+        
+       var bboxGeom = bounds.toGeometry();
+       bboxVector.removeAllFeatures();
+       bboxVector.addFeatures([new OpenLayers.Feature.Vector(bboxGeom)]) 
+
+       document.getElementById("bbox").value = ll.lat.toFixed(5) +","+
+                                               ll.lon.toFixed(5) +","+
+                                               ur.lat.toFixed(5) +","+
+                                               ur.lon.toFixed(5);
+    }
+    
+    function init() {
+      map = new OpenLayers.Map('bboxmap', {projection: "EPSG:900913"});
+
+      var osm = new OpenLayers.Layer.OSM("bboxmap",
+                                         ["http://otile1.mqcdn.com/tiles/1.0.0/osm/${z}/${x}/${y}.png",
+                                          "http://otile2.mqcdn.com/tiles/1.0.0/osm/${z}/${x}/${y}.png",
+                                          "http://otile3.mqcdn.com/tiles/1.0.0/osm/${z}/${x}/${y}.png"],
+                                         {attribution: 'Copyright MapQuest 2011, OpenStreetMap and Contributors 2011 CC-BY-SA'});
+      map.addLayer(osm);
+
+      bboxVector = new OpenLayers.Layer.Vector("Bounding Box");
+      map.addLayer(bboxVector);
+
+      var control = new OpenLayers.Control();
+      OpenLayers.Util.extend(control, {
+        draw: function() {
+          this.box = new OpenLayers.Handler.Box(control,
+            {"done": this.notice},
+            {keyMask: OpenLayers.Handler.MOD_SHIFT});
+          this.box.activate();
+        },
+        notice: function(bounds) {
+          var ll = map.getLonLatFromPixel(new OpenLayers.Pixel(bounds.left, bounds.bottom));
+          var ur = map.getLonLatFromPixel(new OpenLayers.Pixel(bounds.right, bounds.top));
+          var llLat = ll.transform(map.getProjectionObject(), latlon);
+          var urLat = ur.transform(map.getProjectionObject(), latlon);
+          updateBbox(llLat, urLat);
+        }
+      });
+      map.addControl(control);
+
+      {% if initial_loc %}
+      map.zoomTo({{ initial_loc.zoom }});
+      map.setCenter({{ initial_loc.lat }}, {{ initial_loc.lon }});
+      {% else %}
+      map.zoomTo(1);
+      {% endif %}
+      
+    }
+    </script>
+  </head>
+  <body onLoad="init();">
+
+    <div id="bboxmap"></div>
+    <form action="/bboxSelected" method="post">
+      <div><input type="hidden" name="bbox" size="50" id="bbox" /></div>
+      <div><input type="hidden" name="return_url" value="{{ return_url }}"/></div>
+      <div><input type="submit" value="Done" /></div>
+    </form>
+
+  </body>
+</html>
